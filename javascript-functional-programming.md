@@ -184,6 +184,8 @@
 
 5. 柯里化
 
+	函数柯里化就是将一个多参数的函数层层分解为一个参数的fns。
+	
 	有些事物在你得到之前是无足轻重的，得到之后就不可或缺了。
 	
 	curry 的概念很简单：只传递给函数一部分参数来调用它，让它返回一个函数去处理剩下的参数。
@@ -269,7 +271,9 @@
 	
 	
 6. 代码组合
-
+	
+	函数柯里化就是将一个多参数的函数层层分解为一个参数的fns。
+	
 	- 函数饲养
 	
 		```
@@ -282,11 +286,26 @@
 		f 和 g 都是函数，x 是在它们之间通过“管道”传输的值。
 		
 		```
-		var compose = (f, g) => x => f(g(x))
-		var emphasize = x => x + "!"
-		var toUpperCase = x => x.toUpperCase()
-		var shout = compose(emphasize, toUpperCase)
-		console.log(shout("you are awesome"))
+		var compose = function(fns) {
+		  if(fns.length === 1) {
+		    return fns[0];
+		  }
+		  var compose = function(f,g) {
+		    return function(o) {
+		      return f(g(o));
+		    }
+		  }
+		  if(fns.length === 2) {
+		    return compose(fns[0], fns[1])
+		  }else {
+		    var arraylength = fns.length;
+		    var result = compose(fns[arraylength - 2], fns[arraylength - 1]);
+		    for(var i = arraylength - 3; i >= 0; i--) {
+		      result = compose(fns[i], result)
+		    }
+		    return result;
+		  }
+		}
 		```
 		
 		在 compose 的定义中，g 将先于 f 执行，因此就创建了一个从右到左的数据流。这样做的可读性远远高于嵌套一大堆的函数调用，如果不用组合，shout 函数将会是这样的：
@@ -384,27 +403,116 @@ Container 里的值传递给 map 函数之后，就可以任我们操作。为�
 - Maybe
 
 	```
-	var Maybe = function(x){
+	var Maybe = function(x) {
 	  this.__value = x;
-	};
+	}
 	
-	Maybe.of = function(x){
-	  return new Maybe(x)
+	Maybe.of = function(x) {
+	  return new Maybe(x);
 	}
-	Maybe.prototype.isNothing = function(){
-	  return (this.__value === null || this.__value === undefined)
+	Maybe.prototype.isnothing = function() {
+	  return this.__value === null || this.__value === undefined;
 	}
-	Maybe.prototype.map = function(f){
-	  return this.isNothing() ? Maybe.of(null) : Maybe.of(f(this.__value))
+	Maybe.prototype.map = function(f) {
+	  return  this.isnothing() ? Maybe.of(null) : Maybe.of(f(this.__value))
 	}
+	Maybe.prototype.id = function() {
+	  return this.__value;
+	}
+	
+	var functormap = f => functor => functor.map(f)
+	var safeHead = function(xs) {
+	  return Maybe.of(xs[0])  //可能出错
+	}
+	
+	var prop = function(name) {
+	  return function(obj) {
+	    return obj[name]
+	  }
+	}
+	var compose = function(fns) {
+	  if(fns.length === 1) {
+	    return fns[0];
+	  }
+	  var compose = function(f,g) {
+	    return function(o) {
+	      return f(g(o));
+	    }
+	  }
+	  if(fns.length === 2) {
+	    return compose(fns[0], fns[1])
+	  }else {
+	    var arraylength = fns.length;
+	    var result = compose(fns[arraylength - 2], fns[arraylength - 1]);
+	    for(var i = arraylength - 3; i >= 0; i--) {
+	      result = compose(fns[i], result)
+	    }
+	    return result;
+	  }
+	}
+	var streetName = compose([functormap(prop("street")), safeHead, prop("addresses")])
+	console.log(streetName({addresses: [{street: "Shady Ln.", number: 4201}]}))
+
 	```			
 	
 	Maybe 看起来跟 Container 非常类似，但是有一点不同：Maybe 会先检查自己的值是否为空，然后才调用传进来的函数。这样我们在使用 map 的时候就能避免恼人的空值了（注意这个实现出于教学目的做了简化）。
 	
 	```
-	console.log(Maybe.of(null).map(function(x) {
-	  return x.toUpperCase();
-	}))
+	var Maybe = function(x) {
+	  this.__value = x;
+	}
+	
+	Maybe.of = function(x) {
+	  return new Maybe(x);
+	}
+	Maybe.prototype.isnothing = function() {
+	  return this.__value === null || this.__value === undefined;
+	}
+	Maybe.prototype.map = function(f) {
+	  return  this.isnothing() ? Maybe.of(null) : Maybe.of(f(this.__value))
+	}
+	Maybe.prototype.id = function() {
+	  return this.__value;
+	}
+	
+	var withdraw = function(amount) {
+	  return function(o) {
+	    return o.balance - amount >= 0 ? Maybe.of(o.balance - amount)  : Maybe.of(null)
+	  }
+	}
+	
+	var compose = function(fns) {
+		  if(fns.length === 1) {
+		    return fns[0];
+		  }
+		  var compose = function(f,g) {
+		    return function(o) {
+		      return f(g(o));
+		    }
+		  }
+		  if(fns.length === 2) {
+		    return compose(fns[0], fns[1])
+		  }else {
+		    var arraylength = fns.length;
+		    var result = compose(fns[arraylength - 2], fns[arraylength - 1]);
+		    for(var i = arraylength - 3; i >= 0; i--) {
+		      result = compose(fns[i], result)
+		    }
+		    return result;
+		  }
+		}
+	var map = function(f) {
+	  return function(functor) {
+	    return functor.map(f);
+	  }
+	}
+	var finishTransaction = function(x) {
+	  return x;
+	}
+	var dosth = compose([map(finishTransaction), withdraw("20"/*操作obj,转换为maybe*/)])
+	
+	console.log(dosth({balance: 100}))
+
 	```
 	
 	注意看，当传给 map 的值是 null 时，代码并没有爆出错误。
@@ -415,53 +523,247 @@ Container 里的值传递给 map 函数之后，就可以任我们操作。为�
 
 	我们的代码，就像薛定谔的猫一样，在某个特定的时间点有两种状态，而且应该保持这种状况不变直到最后一个函数为止。这样，哪怕代码有很多逻辑性的分支，也能保证一种线性的工作流。
 	
+	```
+	var finishTransaction = function(x) {
+	  return "after withdrawing you still have : " + x;
+	}
+	var maybe = function(x, f) {
+	  return function(m) {
+	    return m.isnothing() ? x : f(m.__value)
+	  }
+	}
+	// var dosth = compose([map(finishTransaction), withdraw("20"/*操作obj,转换为maybe*/)])
+	var dosth = compose([maybe('You are broke!', finishTransaction), withdraw("20")])
+	console.log(dosth({balance: 10}))
+	```
 - Either
 
 	```
-	var Right = function(x) {
-	  this.__value = x
-	}
-	Right.of = function(x) {
-	  return new Right(x)
-	}
-	Right.prototype.map = function(f) {
-	  return Right(f(__this.value))
-	}
-	
-	
 	var Left = function(x) {
-	  this.__value = x
+	  this.__value = x;
 	}
+	
 	Left.of = function(x) {
-	  return new Left(x)
+	  return new Left(x);
 	}
 	Left.prototype.map = function(f) {
-	  return Right(__this.value)
+	  return Left.of(this.__value)
+	}
+	var Right = function(x) {
+	  this.__value = x;
+	}
+	
+	Right.of = function(x) {
+	  return new Right(x);
+	}
+	Right.prototype.map = function(f) {
+	  return Right.of(f(this.__value))
 	}
 	
 	
-	var isString = s => (typeof s === 'string')
-	
-	var isStringLongEnough = function(b) {
-	  return function(s) {
-	    if(s !== null && s !== undefined && isString(s)){
-	      return Right.of(s.length - b > 0);
-	    }
-	    return Left.of("字符串长度不够或者格式不正确");
+	var compose = function(fns) {
+		  if(fns.length === 1) {
+		    return fns[0];
+		  }
+		  var compose = function(f,g) {
+		    return function(o) {
+		      return f(g(o));
+		    }
+		  }
+		  if(fns.length === 2) {
+		    return compose(fns[0], fns[1])
+		  }else {
+		    var arraylength = fns.length;
+		    var result = compose(fns[arraylength - 2], fns[arraylength - 1]);
+		    for(var i = arraylength - 3; i >= 0; i--) {
+		      result = compose(fns[i], result)
+		    }
+		    return result;
+		  }
+		}
+	var map = function(f) {
+	  return function(functor) {
+	    return functor.map(f);
 	  }
 	}
-	var longerThan3 = isStringLongEnough(3)
-	console.log(longerThan3)
-	console.log(longerThan3("Hello"))
-
-	// Right {__value: true}
+	var prop = function(name) {
+	  return function(object) {
+	    return object[name];
+	  }
+	}
+	console.log(Right.of("rain").map(function(s) {
+	  return "b"+s+"!";
+	}))
+	console.log(Left.of("rain").map(function(s) {
+	  return "b"+s+"!";
+	}))
+	console.log(Right.of({name: 'lanyage'}).map(prop('name')))
+	console.log(Left.of('lanyage').map(prop('name')))
+	```	
+	例子: 根据出生日期计算年龄。
+	
+	```
+	var setNow = function(now) {
+	  return function(borndate) {
+	    if(typeof borndate !== 'number') return Left.of('你的出生日期格式不正确!')
+	    return Right.of(now - borndate);
+	  }
+	}
+	var getAge = setNow(2018)
+	var age = getAge(1998)
+	console.log(age)
 	```
 	
+- IO、异步、包裹非纯函数
+
+	```
+	let localStorage = {
+	  url : 'http://localhost:8080/users'
+	}
+	
+	// not pure
+	var getFromLocalStorage = function(key) {
+	  return localStorage[key];
+	}
+	
+	//pure
+	var getFromLocalStorage = function(key) {
+	  return function() {
+	    return localStorage[key];
+	  }
+	}
+	
+	console.log(getFromLocalStorage)
+	console.log(getFromLocalStorage('url'))
+	localStorage.url = 'http://localhost:8080/orders'
+	console.log(getFromLocalStorage)
+	console.log(getFromLocalStorage('url'))
+	```	
+
+	```
+	var compose = function(f,g) {
+	  return function(x) {
+	    return f(g(x))
+	  }
+	}
+	
+	var IO = function(f) {
+	  this.__value = f;
+	}
+	IO.of = function(x) {
+	  return new IO(function() {
+	    return x
+	  });
+	}
+	IO.prototype.map = function(f) {
+	  return new IO(compose(f, this.__value))
+	}
+	
+	var io_window = new IO(function(){return window})
+	var windowwidth = io_window.map(function(window){return window.innerWidth;})
+	console.log(windowwidth)
+	```
+
 - Monad
 
 	一个 functor，只要它定义个了一个 join 方法和一个 of 方法，并遵守一些定律，那么它就是一个 monad。	
 	
 	```
-	Maybe.of(null).chain(safeProp('address')).chain(safeProp('street'));
+	var Maybe = function(x) {
+	  this.__value = x;
+	}
+	
+	Maybe.of = function(x) {
+	  return new Maybe(x);
+	}
+	Maybe.prototype.isnothing = function() {
+	  return this.__value === null || this.__value === undefined;
+	}
+	Maybe.prototype.map = function(f) {
+	  return  this.isnothing() ? Maybe.of(null) : Maybe.of(f(this.__value))
+	}
+	Maybe.prototype.id = function() {
+	  return this.__value;
+	}
+	
+	Maybe.prototype.join = function() {
+	  return this.isnothing() ? Maybe.of(null) : this.__value;
+	}
+	
+	var compose = function(fns) {
+			  if(fns.length === 1) {
+			    return fns[0];
+			  }
+			  var compose = function(f,g) {
+			    return function(o) {
+			      return f(g(o));
+			    }
+			  }
+			  if(fns.length === 2) {
+			    return compose(fns[0], fns[1])
+			  }else {
+			    var arraylength = fns.length;
+			    var result = compose(fns[arraylength - 2], fns[arraylength - 1]);
+			    for(var i = arraylength - 3; i >= 0; i--) {
+			      result = compose(fns[i], result)
+			    }
+			    return result;
+			  }
+	}
+	
+	var safeHead = function(array){
+	  return Maybe.of(array[0]);
+	}
+	
+	var safeProp = function(name) {
+	  return function(object) {
+	    return Maybe.of(object[name])
+	  }
+	}
+	var map = function(f) {
+	  return function(mm) {
+	    return mm.map(f);
+	  }
+	}
+	
+	var join = function(mm) {
+	  return mm.join();
+	}
+	
+	var firstAddressStreet = compose([join,map(safeProp('street')),join,map(safeHead),safeProp('addresses')])
+	
+	console.log(firstAddressStreet( {addresses: [{street: {name: 'Mulburry', number: 8402}, postcode: "WC2N" }]}))
+
 	```
+
+	移除过度紧缩的包裹中的一层。
+	
+	* chain
+		
+		```
+		var chain = function(f) {
+		  return function(m) {
+		    return m.map(f).join();
+		  }
+		}
+		```	
+	
+		
+		```
+		var firstAddressStreet = compose([join,map(safeProp('street')),join,map(safeHead),safeProp('addresses')])
+		var firstAddressStreet2 = compose([chain(safeProp('street')),chain(safeHead),safeProp('addresses')])
+		
+		console.log(firstAddressStreet( {addresses: [{street: {name: 'Mulburry', number: 8402}, postcode: "WC2N" }]}))
+		console.log(firstAddressStreet2( {addresses: [{street: {name: 'Mulburry', number: 8402}, postcode: "WC2N" }]}))
+		```
+		
+	理论
+	
+	```
+	compose(join, map(join)) == compose(join, join)
+	
+	compose(join, of) == compose(join, map(of)) == id
+	```
+	
+	
 			
