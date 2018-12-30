@@ -283,6 +283,21 @@
 		  };
 		};
 		```	
+		
+		加强版
+		
+		```
+		const compose = (...arguments) => {
+		  const size = arguments.length ;
+		  const id = x => x;
+		  if(size === 0) return id;
+		  if(size === 1)
+		    return arguments[0];
+		  const composeHelp = (f, g) =>  x => g(f(x))
+		  return arguments.reverse().reduce(composeHelp, id)
+		}
+		// 注： composeHelp = (f, g) =>  x => g(f(x)) 而不是 f(g(x))
+		```
 		f 和 g 都是函数，x 是在它们之间通过“管道”传输的值。
 		
 		```
@@ -403,56 +418,27 @@ Container 里的值传递给 map 函数之后，就可以任我们操作。为�
 - Maybe
 
 	```
-	var Maybe = function(x) {
-	  this.__value = x;
-	}
+	const map = f => c => c.map(f)
+	const Maybe = x => ({
+	  x,
+	  map: f => x === undefined || x === null ? Maybe.of(x) : Maybe.of(f(x)),
+	  peek: () => x,
+	  decentPeek: (isnull, id) => x === undefined || x === null ? isnull() : id(x)
+	})
+	Maybe.of = x => Maybe(x)
 	
-	Maybe.of = function(x) {
-	  return new Maybe(x);
-	}
-	Maybe.prototype.isnothing = function() {
-	  return this.__value === null || this.__value === undefined;
-	}
-	Maybe.prototype.map = function(f) {
-	  return  this.isnothing() ? Maybe.of(null) : Maybe.of(f(this.__value))
-	}
-	Maybe.prototype.id = function() {
-	  return this.__value;
-	}
-	
-	var functormap = f => functor => functor.map(f)
-	var safeHead = function(xs) {
-	  return Maybe.of(xs[0])  //可能出错
-	}
-	
-	var prop = function(name) {
-	  return function(obj) {
-	    return obj[name]
-	  }
-	}
-	var compose = function(fns) {
-	  if(fns.length === 1) {
-	    return fns[0];
-	  }
-	  var compose = function(f,g) {
-	    return function(o) {
-	      return f(g(o));
-	    }
-	  }
-	  if(fns.length === 2) {
-	    return compose(fns[0], fns[1])
-	  }else {
-	    var arraylength = fns.length;
-	    var result = compose(fns[arraylength - 2], fns[arraylength - 1]);
-	    for(var i = arraylength - 3; i >= 0; i--) {
-	      result = compose(fns[i], result)
-	    }
-	    return result;
-	  }
-	}
-	var streetName = compose([functormap(prop("street")), safeHead, prop("addresses")])
-	console.log(streetName({addresses: [{street: "Shady Ln.", number: 4201}]}))
+	const split = s => s.split('');
+	const increment = array => array.map(e => String.from)
+	const upperCase = array => array.map(e => e.toUpperCase())
+	const invalid = msg => () => msg
+	const id = x => x;
+	const peek = (msg, f) => m => m.peek(msg, f)
+	const success = f => f
+	console.log( Maybe.of( "hello" ).map( split ).map( upperCase ).peek( invalid( '参数错误' ), success( id ) ) )
+	console.log( compose( peek( invalid( '参数错误' ), success( id ) ), map( compose( upperCase, split ) ) )( Maybe.of( "hello" ) ) )
 
+	// 其中map(f)(m)和m.map(f)是一样的
+	// peek是用来将盒子里面的东西释放出来
 	```			
 	
 	Maybe 看起来跟 Container 非常类似，但是有一点不同：Maybe 会先检查自己的值是否为空，然后才调用传进来的函数。这样我们在使用 map 的时候就能避免恼人的空值了（注意这个实现出于教学目的做了简化）。
@@ -539,66 +525,24 @@ Container 里的值传递给 map 函数之后，就可以任我们操作。为�
 - Either
 
 	```
-	var Left = function(x) {
-	  this.__value = x;
-	}
+	const Left = x => ({
+	  x,
+	  map: f => Left(x),
+	  peek:(msg, f) => x === undefined || x === null ? msg : f(x)
+	});
+	Left.of = x => Left(x);
 	
-	Left.of = function(x) {
-	  return new Left(x);
-	}
-	Left.prototype.map = function(f) {
-	  return Left.of(this.__value)
-	}
-	var Right = function(x) {
-	  this.__value = x;
-	}
+	const Right = x => ({
+	  x,
+	  map: f => Right(f(x)),
+	  peek: (msg, f) => x === undefined || x === null ? msg : f(x)
+	})
+	Right.of = x => Right(x);
 	
-	Right.of = function(x) {
-	  return new Right(x);
-	}
-	Right.prototype.map = function(f) {
-	  return Right.of(f(this.__value))
-	}
-	
-	
-	var compose = function(fns) {
-		  if(fns.length === 1) {
-		    return fns[0];
-		  }
-		  var compose = function(f,g) {
-		    return function(o) {
-		      return f(g(o));
-		    }
-		  }
-		  if(fns.length === 2) {
-		    return compose(fns[0], fns[1])
-		  }else {
-		    var arraylength = fns.length;
-		    var result = compose(fns[arraylength - 2], fns[arraylength - 1]);
-		    for(var i = arraylength - 3; i >= 0; i--) {
-		      result = compose(fns[i], result)
-		    }
-		    return result;
-		  }
-		}
-	var map = function(f) {
-	  return function(functor) {
-	    return functor.map(f);
-	  }
-	}
-	var prop = function(name) {
-	  return function(object) {
-	    return object[name];
-	  }
-	}
-	console.log(Right.of("rain").map(function(s) {
-	  return "b"+s+"!";
-	}))
-	console.log(Left.of("rain").map(function(s) {
-	  return "b"+s+"!";
-	}))
-	console.log(Right.of({name: 'lanyage'}).map(prop('name')))
-	console.log(Left.of('lanyage').map(prop('name')))
+	const decorateString = s => s === undefined || s === null ? Left(s) : Right(s)
+	const peek = (msg, f) => m => m.peek(msg, f);
+	console.log(compose(peek('格式不正确，兄弟！', id), map(compose(upperCase, split))) (decorateString('hello')))
+	console.log(compose(peek('格式不正确，兄弟！', id), map(compose(upperCase, split))) (decorateString(null)))
 	```	
 	例子: 根据出生日期计算年龄。
 	
@@ -662,6 +606,19 @@ Container 里的值传递给 map 函数之后，就可以任我们操作。为�
 	var io_window = new IO(function(){return window})
 	var windowwidth = io_window.map(function(window){return window.innerWidth;})
 	console.log(windowwidth)
+	```
+
+	```
+	const getWindow = () => window
+	window.lanyage = 'lanyage'
+	const IO = x => ({
+	  x,
+	  map: f => IO(compose(f, x)),
+	  peek: f => f(x)
+	})
+	IO.of = x => IO(() => x);
+	const peek = f => m => m.peek(f)
+	console.log(compose(peek(x => x), map(x => x * 3))(IO.of(2))())
 	```
 
 - Monad
@@ -765,5 +722,41 @@ Container 里的值传递给 map 函数之后，就可以任我们操作。为�
 	compose(join, of) == compose(join, map(of)) == id
 	```
 	
+-  Ap
+
+	ap 就是这样一种函数，能够把一个 functor 的函数值应用到另一个 functor 的值上。把这句话快速地说上 5 遍。
+	
+	```
+	Container.of(add(2)).ap(Container.of(3));
+	```
+	
+	```
+	Container.of(2).map(add).ap(Container.of(3));
+	```
+	
+	```
+	Container.prototype.ap = function(other_container) {
+	  return other_container.map(this.__value);
+	}
+	``` 
+	
+	理论
+	
+	```
+	F.of(x).map(f) == F.of(f).ap(F.of(x))
+	```
+	
+	```
+	Container.prototype.ap = function(c) {
+	  return c.map(this.__value)
+	}
+	var add =function(x) {
+	  return function(y) {
+	    return x+ y;
+	  }
+	}
+	console.log(Container.of(add).ap(Container.of(2)).ap(Container.of(4)))
+	```
+
 	
 			
